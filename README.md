@@ -1,10 +1,10 @@
-#Minibank
+# Minibank
 A very simple rest api service to teach about cloud computing, containerization and distributed systems.
 
 
 ## Description 
 
-The following are the supported user operations
+The following are the user facing operations that the service will provide once completed:
 
 1) register account
 2) authenticate account
@@ -22,7 +22,11 @@ To register an account you will need to provide a username and password. The fol
 - the username must be alphanumeric
 - the password must be at least 10 characters long
 
-## make deposit
+## Account authentication
+
+Simple token based authentication
+
+## Make deposit
 
 The make deposit account requires:
 
@@ -30,7 +34,7 @@ The make deposit account requires:
 - an account where deposits are transfered from
 - a document identifier
 
-## schedule payment
+## Schedule payment
 
 To schedule a payment:
 
@@ -38,13 +42,13 @@ To schedule a payment:
 - the amount
 - the posting date
 
-## check balance
+## Check balance
 
 This returns the current balance. Accepts the following query parameter:
 
 - asof: returns the balance as of the end of day of the specific date. If the date is before the account opening date, it returns an error.
 
-## get statetent
+## Get statement
 
 Returns the transactions in the current period.  Periods are based on the first day of the month. Accepts the following query parameter:
 

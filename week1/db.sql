@@ -6,9 +6,8 @@ USE minibank;
 CREATE TABLE IF NOT EXISTS account ( 
     id INTEGER NOT NULL AUTO_INCREMENT,
     username CHAR(30) NOT NULL,
-    password CHAR(32) NOT NULL,
-    salt CHAR(32) NOT NULL,
-    timestamp INT UNSIGNED NOT NULL,
+    password CHAR(60) NOT NULL,
+    timestamp BIGINT UNSIGNED NOT NULL,
     PRIMARY KEY(id),
     UNIQUE KEY(username)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
