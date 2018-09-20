@@ -10,12 +10,26 @@ import (
 
 func main() {
 	// Connect to the database
-	dbConn := fmt.Sprintf("minibank:minibank@tcp(localhost)/minibank")
-	models.InitDB(dbConn)
+
+	dbDone_chan := make(chan bool)
+	dbDone := false
+
+	dbConn := fmt.Sprintf("minibank:minibank@tcp(mysql)/minibank")
+	go models.InitDB(dbConn, dbDone_chan)
 	defer models.Database.Close()
-	http.HandleFunc("/api/account/register", handlers.RegisterHandler)
-	// http.HandleFunc("/api/account/token", handlers.TokenHandler)
+	http.HandleFunc("/api/account/register", func(w http.ResponseWriter, r *http.Request) {
+		if dbDone {
+			handlers.RegisterHandler(w, r)
+		} else {
+			handlers.ServerUnavailableHandler(w, r)
+		}
+	})
+	go updateDBDone(&dbDone, dbDone_chan)
 	http.ListenAndServe(port(), nil)
+}
+
+func updateDBDone(dbdone *bool, dbDone_ch <-chan bool) {
+	*dbdone = <-dbDone_ch
 }
 
 func port() string {

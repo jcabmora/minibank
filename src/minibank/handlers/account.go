@@ -24,6 +24,11 @@ func (r Registration) ToJSON() string {
 	return string(jsonbytes)
 }
 
+func ServerUnavailableHandler(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusServiceUnavailable)
+	w.Write([]byte("Service Unavailable"))
+}
+
 func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodPost {
 		body, err := ioutil.ReadAll(r.Body)
