@@ -1,8 +1,10 @@
 VERSION=latest
 SRCDIR=src/minibank
 
+
+
 bin/minibank: $(shell find $(SRCDIR) -name '*.go')
-	docker run -it -v `pwd`:/usr/app \
+	docker run -rm -it -v `pwd`:/usr/app \
 		-w /usr/app \
 		-e GOPATH=/usr/app \
 		-e CGO_ENABLED=0 \
