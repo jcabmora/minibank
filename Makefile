@@ -7,7 +7,7 @@ bin/minibank: $(shell find $(SRCDIR) -name '*.go')
 		-e GOPATH=/usr/app \
 		-e CGO_ENABLED=0 \
 		-e GOOS=linux \
-		golang:1.9-alpine sh -c 'go get minibank && go build -ldflags "-extldflags -static" -o $@ minibank'
+		golang:1.9 sh -c 'go get minibank && go build -ldflags "-extldflags -static" -o $@ minibank'
 
 minibank: bin/minibank
 	docker build -t minibank:$(VERSION) -f Dockerfile bin
@@ -15,6 +15,6 @@ minibank: bin/minibank
 mysql:
 	docker pull mariadb:latest
 
-run-images:
+run-images: minibank mysql
 	./run.sh
 
