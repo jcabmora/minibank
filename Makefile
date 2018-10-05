@@ -1,10 +1,11 @@
 VERSION=latest
 SRCDIR=src/minibank
-
+PROJECT=$(shell gcloud config get-value project)
+REGISTRY=gcr.io/$(PROJECT)
 
 
 bin/minibank: $(shell find $(SRCDIR) -name '*.go')
-	docker run -rm -it -v `pwd`:/usr/app \
+	docker run --rm -it -v `pwd`:/usr/app \
 		-w /usr/app \
 		-e GOPATH=/usr/app \
 		-e CGO_ENABLED=0 \
@@ -13,10 +14,16 @@ bin/minibank: $(shell find $(SRCDIR) -name '*.go')
 
 minibank: bin/minibank
 	docker build -t minibank:$(VERSION) -f Dockerfile bin
+	docker tag minibank:$(VERSION) $(REGISTRY)/minibank:$(VERSION)
 
 mysql:
-	docker pull mariadb:latest
+	docker build -t mariadb:$(VERSION) -f Dockerfile-MariaDB .
+	docker tag mariadb:$(VERSION) $(REGISTRY)/mariadb:$(VERSION)
 
 run-images: minibank mysql
 	./run.sh
+
+push-images: minibank mysql
+	gcloud docker -- push $(REGISTRY)/minibank:$(VERSION)
+	gcloud docker -- push $(REGISTRY)/mariadb:$(VERSION)
 
