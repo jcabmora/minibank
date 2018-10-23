@@ -19,6 +19,8 @@ spec:
         env:
         - name: JWT_SECRET_KEY
           value: addsomethingrandomhere
+        - name: PERSIST_SESSIONS
+          value: "true"
         ports:
         - containerPort: 8080
           name: minibank

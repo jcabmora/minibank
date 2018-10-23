@@ -1,0 +1,2 @@
+requests
+retry==0.9.2
