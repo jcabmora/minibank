@@ -9,6 +9,7 @@ import (
 	"minibank/models"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -17,7 +18,140 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-var secretKey = getSecretKey()
+var secretKey []byte
+var sessionWriter func(uuid.UUID, string)
+var sessionLookup func(string) (string, bool)
+var sessionListLookup func(string) UserSessions
+var sessionDuration uint64
+
+func init() {
+	secretKey = getSecretKey()
+	sessionWriter = getSessionWriter()
+	sessionLookup = getSessionLookup()
+	sessionListLookup = getSessionListLookup()
+	sessionDuration = getSessionDuration()
+}
+
+func persistSessions() bool {
+	persist := os.Getenv("PERSIST_SESSIONS")
+
+	if len(persist) == 0 {
+		return false
+	}
+	if strings.ToLower(persist) == "true" {
+		return true
+	}
+	return false
+}
+
+func getSessionLookup() func(string) (string, bool) {
+	if !persistSessions() {
+		return func(session string) (string, bool) {
+			val, err := SessionUserCache[session]
+			return val, err
+		}
+	}
+	if models.CassandraEnabled {
+		return func(session string) (string, bool) {
+			var username string
+			// UPDATE REQUIRED
+			// Add logic to get a list of sessions from cassandra
+			return username, true
+		}
+	} else {
+		return func(session string) (string, bool) {
+			var username string
+			row := models.Database.QueryRow("SELECT username FROM sessions WHERE session = ?", session)
+			switch err := row.Scan(&username); err {
+			case sql.ErrNoRows:
+				return "", false
+			case nil:
+				return username, true
+			default:
+				return "", false
+			}
+		}
+	}
+}
+
+func getSessionWriter() func(uuid.UUID, string) {
+	if !persistSessions() {
+		return func(session uuid.UUID, username string) {
+			// Update the User to Session cache
+			if userSessions, ok := UserSessionCache[username]; !ok {
+				sessionList := []string{}
+				userSessions = UserSessions{sessionList}
+				userSessions.Sessions = userSessions.addItem(session)
+				UserSessionCache[username] = userSessions
+			} else {
+				userSessions.Sessions = userSessions.addItem(session)
+				UserSessionCache[username] = userSessions
+			}
+			// Update the Session to User cache
+			SessionUserCache[session.String()] = username
+		}
+	}
+	if models.CassandraEnabled {
+		return func(session uuid.UUID, username string) {
+			// UPDATE REQUIRED
+			// Add logic to insert session data into cassandra
+		}
+	} else {
+		return func(session uuid.UUID, username string) {
+			models.Database.Exec("INSERT INTO sessions(session, username, expiration) VALUES (?, ?, ?)",
+				session.String(),
+				username,
+				uint64(time.Now().UnixNano()/1000000)+sessionDuration)
+		}
+	}
+}
+
+func getSessionListLookup() func(string) UserSessions {
+	if !persistSessions() {
+		return func(username string) UserSessions {
+			return UserSessionCache[username]
+		}
+	}
+	if models.CassandraEnabled {
+		return func(username string) UserSessions {
+			sessionList := []string{}
+			// UPDATE REQUIRED
+			// Add logic to get a list of sessions for the user from cassadra and return an UserSessions object
+			return UserSessions{sessionList}
+		}
+
+	} else {
+		return func(username string) UserSessions {
+			rows, err := models.Database.Query("SELECT session FROM sessions WHERE username =?", username)
+			//defer rows.Close()
+			sessionList := []string{}
+			if err == nil {
+				var session string
+				for rows.Next() {
+					err := rows.Scan(&session)
+					if err == nil {
+						sessionList = append(sessionList, session)
+					}
+					// TODO: handle err case
+				}
+			}
+			return UserSessions{sessionList}
+		}
+	}
+}
+
+func getSessionDuration() uint64 {
+	sessDurationEnvVar := os.Getenv("SESSION_DURATION_MILLIS")
+	if len(sessDurationEnvVar) > 0 {
+		ret, err := strconv.ParseUint(sessDurationEnvVar, 10, 64)
+		if err == nil {
+			return ret
+		}
+		log.Fatal("Cowardly refusing to start with an incorrect SESSION_DURATION_MILLIS.")
+	}
+	log.Print("Using default session duration of 24 hrs")
+	return 86400000
+}
 
 // Registration username and password structure
 type Registration struct {
@@ -86,9 +220,9 @@ func AuthValidationMiddleware(next http.HandlerFunc) http.HandlerFunc {
 			cookie, err := r.Cookie("sessionid")
 			if err == nil {
 				session := cookie.Value
-				if _, ok := SessionUserCache[session]; ok {
+				if _, ok := sessionLookup(session); ok {
 					// some kind of validation is also in order here.
-					// We do not check for session expiration or session inactivity.
+					// e.g We do not check for session expiration or session inactivity.
 					next(w, r)
 					return
 				}
@@ -182,19 +316,7 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 						Name:  "sessionid",
 						Value: session.String(),
 					})
-					// Update the User to Session cache
-					if userSessions, ok := UserSessionCache[registration.Username]; !ok {
-						sessionList := []string{}
-						userSessions = UserSessions{sessionList}
-						userSessions.Sessions = userSessions.addItem(session)
-						UserSessionCache[registration.Username] = userSessions
-					} else {
-						userSessions.Sessions = userSessions.addItem(session)
-						UserSessionCache[registration.Username] = userSessions
-					}
-					// Update the Session to User cache
-					SessionUserCache[session.String()] = registration.Username
-
+					sessionWriter(session, registration.Username)
 				}
 			default:
 				w.WriteHeader(http.StatusInternalServerError)
@@ -273,13 +395,15 @@ func SessionListHandler(w http.ResponseWriter, r *http.Request) {
 		})
 		claims := token.Claims.(jwt.MapClaims)
 		username := claims["username"].(string)
-		userSessions = UserSessionCache[username]
+		userSessions = sessionListLookup(username)
 	} else {
 		cookie, err := r.Cookie("sessionid")
 		if err == nil {
 			session := cookie.Value
-			username := SessionUserCache[session]
-			userSessions = UserSessionCache[username]
+			username, found := sessionLookup(session)
+			if found {
+				userSessions = sessionListLookup(username)
+			}
 		}
 	}
 	json.NewEncoder(w).Encode(userSessions)

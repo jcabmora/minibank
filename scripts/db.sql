@@ -12,6 +12,14 @@ CREATE TABLE IF NOT EXISTS account (
     UNIQUE KEY(username)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+CREATE TABLE IF NOT EXISTS sessions (
+    session CHAR(36) NOT NULL,
+    username CHAR(30) not null,
+    expiration BIGINT UNSIGNED NOT NULL,
+    PRIMARY KEY(session)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+
 CREATE USER IF NOT EXISTS 'minibank'@'%' IDENTIFIED by 'minibank';
 
 GRANT ALL PRIVILEGES ON minibank.* to 'minibank'@'%';

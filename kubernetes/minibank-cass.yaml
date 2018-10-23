@@ -21,6 +21,8 @@ spec:
           value: addsomethingrandomhere
         - name: PERSIST_SESSIONS
           value: "true"
+        - name: ENABLE_CASSANDRA
+          value: "true"
         ports:
         - containerPort: 8080
           name: minibank
