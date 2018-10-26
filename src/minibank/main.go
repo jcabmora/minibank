@@ -13,11 +13,11 @@ func main() {
 	dbDoneCh := make(chan bool)
 	dbDone := false
 
-	go models.InitDB(dbConn(), dbDoneCh)
+	go models.InitDB(dbDoneCh)
 	defer models.Database.Close()
 
 	if models.CassandraEnabled {
-		go models.InitCassandra("cassandra")
+		go models.InitCassandra()
 		defer models.CassandraSession.Close()
 	}
 
@@ -51,13 +51,4 @@ func port() string {
 		port = "8080"
 	}
 	return ":" + port
-}
-
-// dbConn looks up database connection string on environment
-func dbConn() string {
-	connectString := os.Getenv("DB_CONNECTION_STRING")
-	if len(connectString) == 0 {
-		connectString = "minibank:minibank@tcp(mysql)/minibank"
-	}
-	return connectString
 }

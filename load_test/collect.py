@@ -57,7 +57,7 @@ def get_levels():
     return levels
 
 
-def main(endpoint, replica_counts, payload):
+def main(endpoint, replica_counts, tag, payload):
     ip_address = get_ip_address()
     for replicas in replica_counts:
         update_replica_count(replicas)
@@ -86,14 +86,14 @@ def main(endpoint, replica_counts, payload):
                     break
             results.append(level_results)
 
-        with open('{}/results_{}.csv'.format(OUT_DIR, replicas), 'w') as csvfile:
+        with open('{}/{}_{}.csv'.format(OUT_DIR, tag, replicas), 'w') as csvfile:
             writer = csv.DictWriter(csvfile, fieldnames=['con_level', 'rps', '98p', 'longest'])
             writer.writeheader()
             for row in results:
                 writer.writerow(row)
 
         # also dump the dictionary:
-        with open('{}/results_{}.json'.format(OUT_DIR, replicas), 'w') as jsonfile:
+        with open('{}/{}_{}.json'.format(OUT_DIR, tag, replicas), 'w') as jsonfile:
             json.dump(results, jsonfile)
 
 
@@ -127,6 +127,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Runs multiple AB tests for a Kubernetes endpoint and aggregates the results.')
     parser.add_argument('--endpoint', help='Endpoint')    
     parser.add_argument('--replicas', nargs='+', type=int, help='Replica counts')
+    parser.add_argument('--tag', default='results', help='Tag to add to result filenames')
     parser.add_argument('--payload', help='File to use as payload')
     args = parser.parse_args()
 
@@ -142,4 +143,4 @@ if __name__ == "__main__":
             if e.errno != errno.EEXIST:
                 raise
 
-    main(args.endpoint, args.replicas, args.payload)
+    main(args.endpoint, args.replicas, args.tag, args.payload)

@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/dgrijalva/jwt-go"
+	"github.com/gocql/gocql"
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -51,16 +52,26 @@ func getSessionLookup() func(string) (string, bool) {
 			return val, err
 		}
 	}
-	return func(session string) (string, bool) {
-		var username string
-		row := models.Database.QueryRow("SELECT username FROM sessions WHERE session = ?", session)
-		switch err := row.Scan(&username); err {
-		case sql.ErrNoRows:
-			return "", false
-		case nil:
+	if models.CassandraEnabled {
+		return func(session string) (string, bool) {
+			var username string
+			if err := models.CassandraSession.Query("SELECT username FROM minibank.sessions WHERE session = ?", session).Consistency(gocql.One).Scan(&username); err != nil {
+				return "", false
+			}
 			return username, true
-		default:
-			return "", false
+		}
+	} else {
+		return func(session string) (string, bool) {
+			var username string
+			row := models.Database.QueryRow("SELECT username FROM sessions WHERE session = ?", session)
+			switch err := row.Scan(&username); err {
+			case sql.ErrNoRows:
+				return "", false
+			case nil:
+				return username, true
+			default:
+				return "", false
+			}
 		}
 	}
 }
@@ -82,11 +93,22 @@ func getSessionWriter() func(uuid.UUID, string) {
 			SessionUserCache[session.String()] = username
 		}
 	}
-	return func(session uuid.UUID, username string) {
-		models.Database.Exec("INSERT INTO sessions(session, username, expiration) VALUES (?, ?, ?)",
-			session.String(),
-			username,
-			uint64(time.Now().UnixNano()/1000000)+sessionDuration) // TODO: add expiration offset
+	if models.CassandraEnabled {
+		return func(session uuid.UUID, username string) {
+			if err := models.CassandraSession.Query("INSERT INTO minibank.sessions(session, username, expiration) VALUES (?, ?, ?)",
+				session.String(),
+				username,
+				uint64(time.Now().UnixNano()/1000000)+sessionDuration).Exec(); err != nil {
+				log.Fatal(err)
+			}
+		}
+	} else {
+		return func(session uuid.UUID, username string) {
+			models.Database.Exec("INSERT INTO sessions(session, username, expiration) VALUES (?, ?, ?)",
+				session.String(),
+				username,
+				uint64(time.Now().UnixNano()/1000000)+sessionDuration)
+		}
 	}
 }
 
@@ -96,21 +118,34 @@ func getSessionListLookup() func(string) UserSessions {
 			return UserSessionCache[username]
 		}
 	}
-	return func(username string) UserSessions {
-		rows, err := models.Database.Query("SELECT session FROM sessions WHERE username =?", username)
-		//defer rows.Close()
-		sessionList := []string{}
-		if err == nil {
+	if models.CassandraEnabled {
+		return func(username string) UserSessions {
+			iter := models.CassandraSession.Query("SELECT session FROM minibank.sessions WHERE username =? allow filtering", username).Iter()
+			sessionList := []string{}
 			var session string
-			for rows.Next() {
-				err := rows.Scan(&session)
-				if err == nil {
-					sessionList = append(sessionList, session)
-				}
-				// TODO: handle err case
+			for iter.Scan(&session) {
+				sessionList = append(sessionList, session)
 			}
+			return UserSessions{sessionList}
 		}
-		return UserSessions{sessionList}
+
+	} else {
+		return func(username string) UserSessions {
+			rows, err := models.Database.Query("SELECT session FROM sessions WHERE username =?", username)
+			//defer rows.Close()
+			sessionList := []string{}
+			if err == nil {
+				var session string
+				for rows.Next() {
+					err := rows.Scan(&session)
+					if err == nil {
+						sessionList = append(sessionList, session)
+					}
+					// TODO: handle err case
+				}
+			}
+			return UserSessions{sessionList}
+		}
 	}
 }
 

@@ -40,7 +40,7 @@ prepare-venv:
 
 .PHONE: load-test
 load-test: prepare-venv
-	venv/bin/python load_test/collect.py --endpoint api/account/login --replicas $(REPLICAS) --payload load_test/payload.json
+	venv/bin/python load_test/collect.py --endpoint api/account/login --replicas $(REPLICAS) --tag $(TAG) --payload load_test/payload.json
 
 
 .PHONY: clean
