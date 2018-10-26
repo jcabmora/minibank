@@ -18,11 +18,19 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-var secretKey = getSecretKey()
-var sessionWriter = getSessionWriter()
-var sessionLookup = getSessionLookup()
-var sessionListLookup = getSessionListLookup()
-var sessionDuration = getSessionDuration()
+var secretKey []byte
+var sessionWriter func(uuid.UUID, string)
+var sessionLookup func(string) (string, bool)
+var sessionListLookup func(string) UserSessions
+var sessionDuration uint64
+
+func init() {
+	secretKey = getSecretKey()
+	sessionWriter = getSessionWriter()
+	sessionLookup = getSessionLookup()
+	sessionListLookup = getSessionListLookup()
+	sessionDuration = getSessionDuration()
+}
 
 func persistSessions() bool {
 	persist := os.Getenv("PERSIST_SESSIONS")

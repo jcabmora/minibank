@@ -16,6 +16,11 @@ func main() {
 	go models.InitDB(dbConn(), dbDoneCh)
 	defer models.Database.Close()
 
+	if models.CassandraEnabled {
+		go models.InitCassandra("cassandra")
+		defer models.CassandraSession.Close()
+	}
+
 	http.HandleFunc("/api/account/register", validateDBConn(handlers.RegisterHandler, &dbDone))
 	http.HandleFunc("/api/account/login", validateDBConn(handlers.LoginHandler, &dbDone))
 	http.HandleFunc("/api/account/token", validateDBConn(handlers.TokenHandler, &dbDone))
