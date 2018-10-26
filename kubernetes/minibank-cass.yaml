@@ -1,0 +1,29 @@
+apiVersion: apps/v1 # for versions before 1.9.0 use apps/v1beta2
+kind: Deployment
+metadata:
+  name: minibank
+spec:
+  selector:
+    matchLabels:
+      app: minibank
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: minibank
+    spec:
+      containers:
+      - image: gcr.io/<YOUR_PROJECT_ID>/minibank:latest
+        name: minibank
+        env:
+        - name: JWT_SECRET_KEY
+          value: addsomethingrandomhere
+        - name: PERSIST_SESSIONS
+          value: "true"
+        - name: ENABLE_CASSANDRA
+          value: "true"
+        ports:
+        - containerPort: 8080
+          name: minibank
+
