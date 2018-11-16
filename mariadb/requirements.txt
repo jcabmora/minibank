@@ -1,0 +1,2 @@
+kazoo==2.5.0
+netifaces==0.10.7

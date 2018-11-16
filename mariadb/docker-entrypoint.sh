@@ -189,6 +189,7 @@ fi
 
 
 if [[  "$WSREP_ON" == "ON" ]]; then
+    python3 /clustering.py
     exec sleep infinity
 else
     exec "$@"
